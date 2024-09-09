@@ -21,13 +21,13 @@ from speculative_decoding import (
 
 # constants
 
-NUM_BATCHES = int(1e5)
+NUM_BATCHES = int(50)
 BATCH_SIZE = 4
 GRAD_ACCUM_EVERY = 4
 LEARNING_RATE = 1e-4
 VALIDATE_EVERY = 100
 PRIME_LENGTH = 128
-GENERATE_EVERY = 500
+GENERATE_EVERY = 5
 GENERATE_LENGTH = 512
 SEQ_LEN = 512
 GAMMA = 5
@@ -61,6 +61,17 @@ def benchmark(fn):
         elapsed_time_ms = start_event.elapsed_time(end_event)
         return out, elapsed_time_ms
     return inner
+
+def benchmark_cpu(fn):
+    @wraps(fn)
+    def inner(*args, **kwargs):
+        start_time = time.perf_counter()
+        out = fn(*args, **kwargs)
+        end_time = time.perf_counter()
+        elapsed_time_ms = end_time - start_time
+        return out, elapsed_time_ms
+    return inner
+
 
 # instantiate transformer
 
@@ -159,9 +170,9 @@ for i in tqdm.tqdm(range(NUM_BATCHES), mininterval = 10.0, desc = "training"):
 
         prompt = inp[None, ...]
 
-        sampled, base_decode_elapsed = benchmark(base_decoding)(model, prompt, GENERATE_LENGTH)
+        sampled, base_decode_elapsed = benchmark_cpu(base_decoding)(model, prompt, GENERATE_LENGTH)
 
-        (spec_decode_sampled, num_accepted), spec_decode_elapsed = benchmark(speculative_decoding)(model, small_model, prompt, GENERATE_LENGTH, GAMMA)
+        (spec_decode_sampled, num_accepted), spec_decode_elapsed = benchmark_cpu(speculative_decoding)(model, small_model, prompt, GENERATE_LENGTH, GAMMA)
 
         base_decode_output = decode_tokens(sampled[0])
         spec_decode_output = decode_tokens(spec_decode_sampled[0])
